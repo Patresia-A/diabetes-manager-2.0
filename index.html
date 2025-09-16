@@ -1,14 +1,244 @@
-<html>
-  <head>
-    <title>CS 1030 Web Page Project</title>
-    <!-- Replace the content in the following line with your name. -->
-    <meta name="author" content="REPLACE WITH YOUR NAME">
-  </head>
-  <body>
-    <!-- Replace the lines in this body with your content. -->
-    <h1>CS 1030 - Web page Project</h1>
-    <img src="logo.png">
-    <p>Hello world!</p>
-    <p><a href="secondpage.html">More</a></p>
-  </body>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GlucoReminder – Single‑File HTML (React SPA)</title>
+  <style>
+    :root {
+      --blue: #0072B5;
+      --blue-dark: #1e3a8a;
+      --bg: rgb(240, 240, 240);
+    }
+    html, body { height: 100%; margin: 0; }
+    body {
+      background: var(--bg);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .container {
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 16px;
+    }
+    h1 { margin: 0 0 24px; font-size: 25pt; font-weight: 800; text-align: center; }
+    .row { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .hourglass { width: 48px; height: 48px; transition: transform 1000ms ease; }
+    .circleBtn {
+      position: relative; border-radius: 9999px; display: flex; align-items: center; justify-content: center;
+      width: 300px; height: 300px; border: none; outline: none; cursor: pointer; transition: all 300ms ease; box-sizing: border-box;
+      color: #fff; background: var(--blue); border: 100px solid var(--blue);
+    }
+    .circleBtn.checked { background: transparent; border: none; color: var(--blue-dark); }
+    .sr-only { position: absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip: rect(0,0,0,0); white-space: nowrap; border:0; }
+    .instructions { margin-top: 16px; text-align: center; max-width: 560px; font-size: 14pt; padding: 0 8px; }
+    canvas.confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 10; display: none; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <canvas id="confetti" class="confetti"></canvas>
+
+  <!-- React & Babel (for in-browser JSX) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useEffect, useRef, useState } = React;
+
+    const HOURGLASS_LEFT = "https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/0b9e5562-ec2e-458e-87b6-e07f2e834577.png";
+    const HOURGLASS_RIGHT = "https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/6586f2e9-2116-424c-b11a-8d28eaba1712.png";
+
+    const TWO_HOURS = 2 * 60 * 60;
+
+    function formatTime(totalSeconds) {
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
+      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function App() {
+      const [appState, setAppState] = useState('idle'); // 'idle' | 'counting' | 'completed' | 'checked'
+      const [timeLeft, setTimeLeft] = useState(TWO_HOURS);
+      const [hourglassRotation, setHourglassRotation] = useState(0);
+      const confettiCanvasRef = useRef(null);
+      const audioContextRef = useRef(null);
+      const confettiAnimRef = useRef(null);
+      const hourglassIntervalRef = useRef(null);
+
+      // Play completion sound
+      const playCompletionSound = () => {
+        try {
+          if (!audioContextRef.current) {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            audioContextRef.current = new Ctx();
+          }
+          const ctx = audioContextRef.current;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(880, ctx.currentTime);
+          gain.gain.setValueAtTime(0.1, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.5);
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.start(); osc.stop(ctx.currentTime + 1.5);
+        } catch (e) { console.log('Audio error:', e); }
+      };
+
+      // Confetti animation
+      const startConfetti = () => {
+        const canvas = confettiCanvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const setCanvasSize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+        setCanvasSize();
+        const onResize = () => setCanvasSize();
+        window.addEventListener('resize', onResize);
+
+        const colors = ['#0072B5', '#D50B53', '#F9A01B', '#8CC63F', '#662D91'];
+        const particles = Array.from({ length: 150 }, () => ({
+          x: Math.random() * canvas.width,
+          y: -Math.random() * canvas.height,
+          size: Math.random() * 10 + 5,
+          speed: Math.random() * 5 + 2,
+          angle: Math.random() * Math.PI * 2,
+          spin: Math.random() * 0.2 - 0.1,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          alive: true,
+        }));
+
+        const animate = () => {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          let active = 0;
+          for (const p of particles) {
+            if (!p.alive) continue;
+            if (p.y < canvas.height) {
+              p.y += p.speed; p.x += Math.sin(p.angle) * 2; p.angle += p.spin;
+              ctx.fillStyle = p.color; ctx.beginPath(); ctx.rect(p.x, p.y, p.size, p.size); ctx.fill();
+              active++;
+            } else { p.alive = false; }
+          }
+          if (active > 0) { confettiAnimRef.current = requestAnimationFrame(animate); }
+          else {
+            setAppState('completed');
+            window.removeEventListener('resize', onResize);
+          }
+        };
+
+        animate();
+      };
+
+      // Main circle click handler
+      const handleCircleClick = () => {
+        switch (appState) {
+          case 'idle': setAppState('counting'); break;
+          case 'completed': setAppState('checked'); break;
+          case 'checked': setAppState('idle'); break;
+          default: break;
+        }
+      };
+
+      // Timer effect
+      useEffect(() => {
+        let timer = null;
+        if (appState === 'counting' && timeLeft > 0) {
+          timer = setTimeout(() => setTimeLeft(t => t - 1), 1000);
+        } else if (appState === 'counting' && timeLeft === 0) {
+          setAppState('completed');
+          playCompletionSound();
+          const c = confettiCanvasRef.current; if (c) c.style.display = 'block';
+          startConfetti();
+        }
+        return () => { if (timer) clearTimeout(timer); };
+      }, [appState, timeLeft]);
+
+      // Hourglass rotation while in checked state
+      useEffect(() => {
+        if (appState === 'checked') {
+          hourglassIntervalRef.current = setInterval(() => {
+            setHourglassRotation(prev => (prev + 180) % 360);
+          }, 5000);
+        } else {
+          if (hourglassIntervalRef.current) { clearInterval(hourglassIntervalRef.current); hourglassIntervalRef.current = null; }
+        }
+        return () => { if (hourglassIntervalRef.current) { clearInterval(hourglassIntervalRef.current); hourglassIntervalRef.current = null; } };
+      }, [appState]);
+
+      // Cleanup on unload
+      useEffect(() => () => {
+        if (confettiAnimRef.current != null) cancelAnimationFrame(confettiAnimRef.current);
+        if (audioContextRef.current && audioContextRef.current.close) {
+          try { audioContextRef.current.close(); } catch {}
+        }
+      }, []);
+
+      // Reset timer when returning to idle
+      useEffect(() => { if (appState === 'idle') setTimeLeft(TWO_HOURS); }, [appState]);
+
+      const ariaLabel = appState === 'idle' ? 'Start glucose monitoring timer' :
+                        appState === 'counting' ? 'Timer counting down' :
+                        appState === 'completed' ? 'Glucose check reminder' :
+                        'Confirm glucose check completed';
+
+      const btnClass = 'circleBtn' + (appState === 'checked' ? ' checked' : '');
+
+      return (
+        <div className="container">
+          <header><h1>GlucoReminder</h1></header>
+          <div className="row">
+            {appState === 'checked' && (
+              <img className="hourglass" style={{ transform: `rotate(${hourglassRotation}deg)` }} src={HOURGLASS_LEFT} alt="Rotating hourglass indicating time passage" />
+            )}
+
+            <button
+              className={btnClass}
+              aria-label={ariaLabel}
+              onClick={handleCircleClick}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCircleClick(); } }}
+            >
+              <span style={{ fontSize: 14, fontWeight: 800 }}>
+                {appState === 'idle' && 'Nom Nom time'}
+                {appState === 'counting' && formatTime(timeLeft)}
+                {appState === 'completed' && 'I will check now'}
+                {appState === 'checked' && 'I have checked'}
+              </span>
+              <span className="sr-only">{ariaLabel}</span>
+            </button>
+
+            {appState === 'checked' && (
+              <img className="hourglass" style={{ transform: `rotate(${hourglassRotation}deg)` }} src={HOURGLASS_RIGHT} alt="Rotating hourglass indicating time passage" />
+            )}
+          </div>
+
+          <div className="instructions">
+            {appState === 'idle' && (<p>Click the circle when you start eating to begin the 2‑hour timer.</p>)}
+            {appState === 'counting' && (<p>Timer running. Check your glucose in {formatTime(timeLeft)}.</p>)}
+            {appState === 'completed' && (<p>Time to check your glucose levels!</p>)}
+            {appState === 'checked' && (<p>Great job checking your glucose! Click again to reset.</p>)}
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+
+    // Attach canvas ref after React mounts
+    window.addEventListener('DOMContentLoaded', () => {
+      const canvas = document.getElementById('confetti');
+      // Expose for React via a mutation (simplest for single-file)
+      // We'll set it using a tiny polling until React has run once
+      const tryAttach = () => {
+        const rootEl = document.getElementById('root');
+        if (!rootEl) return;
+        // No direct access to inner refs here; handled in component via querySelector
+      };
+      tryAttach();
+    });
+
+  </script>
+</body>
 </html>
