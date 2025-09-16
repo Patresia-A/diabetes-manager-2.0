@@ -1,1 +1,2 @@
 This is my glucose reminder SPA. Used a different generative AI for this version. 
+For this version I used my old friend, Blackbox AI. I forgot just how much I enjoy this AI over CHatGPT. I gave Blackbox AI the same exact prompt (compy-pasted) and it delivered an SPA (almost) exactly how I imagined, which cannot be said about using Codex from ChatGPT. I did then convert the code from the format given by Blackbox to html using CHatGPT, as I had used the integrated web app functionality on Blackbox AI. 
