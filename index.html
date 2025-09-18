@@ -33,6 +33,9 @@
     .sr-only { position: absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip: rect(0,0,0,0); white-space: nowrap; border:0; }
     .instructions { margin-top: 16px; text-align: center; max-width: 560px; font-size: 14pt; padding: 0 8px; }
     canvas.confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 10; display: none; }
+    .footer { margin-top: 32px; font-size: 12pt; text-align: center; }
+    .footer a { color: var(--blue-dark); text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -219,25 +222,20 @@
             {appState === 'completed' && (<p>Time to check your glucose levels!</p>)}
             {appState === 'checked' && (<p>Great job checking your glucose! Click again to reset.</p>)}
           </div>
+
+          <footer className="footer">
+            <p>
+              <a href="https://github.com/Patresia-A/diabetes-manager-2.0" target="_blank" rel="noopener noreferrer">
+                View Repository on GitHub
+              </a>
+            </p>
+          </footer>
         </div>
       );
     }
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
-
-    // Attach canvas ref after React mounts
-    window.addEventListener('DOMContentLoaded', () => {
-      const canvas = document.getElementById('confetti');
-      // Expose for React via a mutation (simplest for single-file)
-      // We'll set it using a tiny polling until React has run once
-      const tryAttach = () => {
-        const rootEl = document.getElementById('root');
-        if (!rootEl) return;
-        // No direct access to inner refs here; handled in component via querySelector
-      };
-      tryAttach();
-    });
 
   </script>
 </body>
